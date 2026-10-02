@@ -65,8 +65,6 @@ A full extracted-filesystem-to-stock-image rebuild is **not** yet claimed. QNX6/
 - `docs/MHI2_FLASH_LAYOUT_AND_RECOVERY.md`: measured image sizes/start bytes, historical address evidence and recovery boundaries.
 - `docs/REPACK_AND_METAINFO.md`: reverse/package reconstruction model and current rebuild capability matrix.
 - `docs/EXTERNAL_TOOLS.md`: external Java, Ghidra and QNX toolchains.
-- `docs/FACTORY_ACCESS_REFERENCE.md`: provenance and use of the normalized historical MHI2/MHI2Q root-access reference.
-- `data/`: normalized public hash/password and firmware/MU reference tables; no source PDF is bundled.
 - `reports/`: multi-firmware validation matrix, detailed MU1440 baseline audit, and explicit limitations.
 - `DEPENDENCIES.md`: provenance, license status, and packaging boundaries.
 
@@ -74,15 +72,6 @@ Run tests with:
 
     python -m unittest discover -s tests -v
 
-## Firmware/root access reference
-
-A normalized extract of the historical public MHI2/MHI2Q password list is included as searchable CSV data. The original PDF is not bundled.
-
-    python tools/firmware_access.py --firmware MHI2_ER_SKG13_P4526
-    python tools/firmware_access.py --mu 1440 --brand Skoda
-    python tools/firmware_access.py --hash 88PTlG6BPJk6M --hash-only
-
-Source blanks remain blank; the lookup reports global hash-table matches separately instead of silently filling a firmware row. See `docs/FACTORY_ACCESS_REFERENCE.md`.
 
 ## Safety and scope
 
