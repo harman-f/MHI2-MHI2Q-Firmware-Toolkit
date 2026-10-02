@@ -38,23 +38,33 @@ def sha1_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def chunk_sha1_bytes(data: bytes, checksum_size: int = DEFAULT_CHECKSUM_SIZE) -> tuple[int, list[str]]:
+    if checksum_size < 0:
+        raise ValueError("CheckSumSize must be >= 0")
+    if checksum_size == 0:
+        return len(data), [sha1_bytes(data)]
+    digests = [sha1_bytes(data[offset:offset + checksum_size])
+               for offset in range(0, len(data), checksum_size)]
+    # Historical update-hashes.py emits no digest for an empty file in
+    # chunked mode. Keep that behavior explicit.
+    return len(data), digests
+
+
 def chunk_sha1_file(path: Path, checksum_size: int = DEFAULT_CHECKSUM_SIZE) -> tuple[int, list[str]]:
     if checksum_size < 0:
         raise ValueError("CheckSumSize must be >= 0")
+    if checksum_size == 0:
+        data = path.read_bytes()
+        return chunk_sha1_bytes(data, checksum_size)
     size = 0
     digests: list[str] = []
     with path.open("rb") as stream:
-        if checksum_size == 0:
-            data = stream.read()
-            return len(data), [sha1_bytes(data)]
         while True:
             chunk = stream.read(checksum_size)
             if not chunk:
                 break
             size += len(chunk)
             digests.append(sha1_bytes(chunk))
-    # Historical update-hashes.py emits no digest for an empty file in
-    # chunked mode. Keep that behavior explicit.
     return size, digests
 
 
@@ -225,9 +235,14 @@ class LineEditor:
     def render(self) -> str:
         output: list[str] = []
         for index, line in enumerate(self.lines):
+            inserts = self.after.get(index, [])
             if index not in self.removals:
-                output.append(self.replacements.get(index, line))
-            output.extend(self.after.get(index, []))
+                rendered = self.replacements.get(index, line)
+                output.append(rendered)
+                if inserts and rendered and not rendered.endswith(("\n", "\r")):
+                    separator = "\r\n" if inserts[0].endswith("\r\n") else "\n"
+                    output.append(separator)
+            output.extend(inserts)
         return "".join(output)
 
 
@@ -302,7 +317,11 @@ def _existing_hash_header(data: bytes) -> tuple[str, str]:
     return newline.join(header), newline
 
 
-def build_hashes_bytes(directory: Path, checksum_size: int = DEFAULT_CHECKSUM_SIZE) -> tuple[bytes, int, list[dict[str, Any]]]:
+def build_hashes_bytes(
+    directory: Path,
+    checksum_size: int = DEFAULT_CHECKSUM_SIZE,
+    planned_files: dict[Path, bytes] | None = None,
+) -> tuple[bytes, int, list[dict[str, Any]]]:
     finalhash = directory / "hashes.txt"
     old = finalhash.read_bytes() if finalhash.is_file() else b""
     header, newline = _existing_hash_header(old)
@@ -310,7 +329,9 @@ def build_hashes_bytes(directory: Path, checksum_size: int = DEFAULT_CHECKSUM_SI
     payload_bytes = 0
     entries: list[dict[str, Any]] = []
     directory_resolved = directory.resolve()
-    files: list[Path] = []
+    overrides = {path.resolve(strict=False): data
+                 for path, data in (planned_files or {}).items()}
+    files: dict[Path, Path] = {}
     for path in directory.rglob("*"):
         if path == finalhash or not path.is_file():
             continue
@@ -319,20 +340,29 @@ def build_hashes_bytes(directory: Path, checksum_size: int = DEFAULT_CHECKSUM_SI
             raise ValueError(
                 f"directory member escapes section root: {path.relative_to(directory)}"
             )
-        files.append(path)
-    files.sort(key=lambda p: p.relative_to(directory).as_posix().casefold())
-    for path in files:
-        size, digests = chunk_sha1_file(path, checksum_size)
+        files[resolved] = path
+    for resolved in overrides:
+        if resolved == finalhash.resolve(strict=False):
+            continue
+        if resolved.is_relative_to(directory_resolved):
+            files.setdefault(resolved, resolved)
+    ordered = sorted(files.items(),
+                     key=lambda item: item[0].relative_to(directory_resolved).as_posix().casefold())
+    for resolved, display_path in ordered:
+        relative = resolved.relative_to(directory_resolved).as_posix()
+        if resolved in overrides:
+            size, digests = chunk_sha1_bytes(overrides[resolved], checksum_size)
+        else:
+            size, digests = chunk_sha1_file(display_path, checksum_size)
         payload_bytes += size
-        lines = [f'FileName = "{path.name}"',
+        lines = [f'FileName = "{relative}"',
                  f'FileSize = "{size}"',
                  f'CheckSumSize = "{checksum_size}"']
         for number, digest in enumerate(digests):
             key = "CheckSum" if number == 0 else f"CheckSum{number}"
             lines.append(f'{key} = "{digest}"')
         blocks.append(newline.join(lines))
-        entries.append({"path": path.relative_to(directory).as_posix(),
-                        "bytes": size, "digests": digests})
+        entries.append({"path": relative, "bytes": size, "digests": digests})
     pieces: list[str] = []
     if header:
         pieces.append(header)
@@ -357,19 +387,47 @@ def _plan_refresh(text: str, package_root: Path, mode: str = "auto") -> tuple[st
     editable_instances = [item for item in instances if item["section_line"] >= editable_from]
 
     def plan_hashes(directory: Path, chunk_size: int) -> tuple[bytes, int, list[dict[str, Any]]]:
-        generated, total, entries = build_hashes_bytes(directory, chunk_size)
+        generated, total, entries = build_hashes_bytes(directory, chunk_size, sidecars)
         sidecar = directory / "hashes.txt"
         old = sidecar.read_bytes() if sidecar.is_file() else b""
+        report_row = {
+            "path": sidecar.relative_to(package_root).as_posix(),
+            "old_sha1": sha1_bytes(old) if old else None,
+            "new_sha1": sha1_bytes(generated),
+            "bytes": len(generated),
+            "entry_count": len(entries),
+        }
+        sidecar_report[:] = [row for row in sidecar_report if row["path"] != report_row["path"]]
         if old != generated:
             sidecars[sidecar] = generated
-            sidecar_report.append({
-                "path": sidecar.relative_to(package_root).as_posix(),
-                "old_sha1": sha1_bytes(old) if old else None,
-                "new_sha1": sha1_bytes(generated),
-                "bytes": len(generated),
-                "entry_count": len(entries),
-            })
+            sidecar_report.append(report_row)
+        else:
+            sidecars.pop(sidecar, None)
         return generated, total, entries
+
+    dir_plans: dict[int, tuple[bytes, int, list[dict[str, Any]]]] = {}
+    dir_errors: dict[int, str] = {}
+    dir_candidates: list[tuple[int, Path, dict[str, Any], int]] = []
+    for instance in editable_instances:
+        if section_role(instance["name"]) != "dir":
+            continue
+        try:
+            chunk_size = checksum_size(instance)
+            directory = safe_section_directory(package_root, instance["name"])
+        except ValueError as exc:
+            dir_errors[id(instance)] = str(exc)
+            continue
+        if not directory.is_dir():
+            dir_errors[id(instance)] = f"directory not found: {directory.relative_to(package_root)}"
+            continue
+        depth = len(directory.relative_to(package_root).parts)
+        dir_candidates.append((depth, directory, instance, chunk_size))
+
+    for _, directory, instance, chunk_size in sorted(dir_candidates, key=lambda item: item[0], reverse=True):
+        try:
+            dir_plans[id(instance)] = plan_hashes(directory, chunk_size)
+        except ValueError as exc:
+            dir_errors[id(instance)] = str(exc)
 
     for instance in editable_instances:
         section = instance["name"]
@@ -406,20 +464,14 @@ def _plan_refresh(text: str, package_root: Path, mode: str = "auto") -> tuple[st
 
         elif role == "dir":
             file_size_row = first_key(instance, "FileSize")
-            try:
-                directory = safe_section_directory(package_root, section)
-            except ValueError as exc:
-                unresolved.append({"section": section, "reason": str(exc)})
+            if id(instance) in dir_errors:
+                unresolved.append({"section": section, "reason": dir_errors[id(instance)]})
                 continue
-            if not directory.is_dir():
-                unresolved.append({"section": section,
-                                   "reason": f"directory not found: {directory.relative_to(package_root)}"})
+            directory = safe_section_directory(package_root, section)
+            if id(instance) not in dir_plans:
+                unresolved.append({"section": section, "reason": "directory planning unavailable"})
                 continue
-            try:
-                generated, total_size, _ = plan_hashes(directory, chunk_size)
-            except ValueError as exc:
-                unresolved.append({"section": section, "reason": str(exc)})
-                continue
+            generated, total_size, _ = dir_plans[id(instance)]
             _update_value(editor, changes, file_size_row, str(total_size),
                           f"directory payload + hashes.txt bytes: {directory.relative_to(package_root)}")
             if chunk_size == 0:
@@ -448,17 +500,21 @@ def _plan_refresh(text: str, package_root: Path, mode: str = "auto") -> tuple[st
                 continue
             _update_value(editor, changes, final_checksum, script_digests[0],
                           f"FinalScript first SHA-1 block: {script.relative_to(package_root)}")
-            try:
-                generated, total_size, _ = plan_hashes(script.parent, DEFAULT_CHECKSUM_SIZE)
-            except ValueError as exc:
-                unresolved.append({"section": section, "reason": f"FinalScript directory: {exc}"})
-                continue
             dir_name = (PurePosixPath(final_script["value"].replace("\\", "/")).parent / "dir").as_posix()
             dir_name = dir_name.removeprefix("./").replace("/", "\\").casefold()
             matches = [candidate for candidate in editable_instances
                        if candidate["name"].replace("/", "\\").casefold() == dir_name]
             if matches:
                 directory_instance = matches[0]
+                if id(directory_instance) in dir_errors:
+                    unresolved.append({"section": section,
+                                       "reason": f"FinalScript directory: {dir_errors[id(directory_instance)]}"})
+                    continue
+                if id(directory_instance) not in dir_plans:
+                    unresolved.append({"section": section,
+                                       "reason": "FinalScript directory planning unavailable"})
+                    continue
+                generated, total_size, _ = dir_plans[id(directory_instance)]
                 _update_value(editor, changes, first_key(directory_instance, "FileSize"), str(total_size),
                               f"FinalScript directory payload + hashes.txt bytes: {script.parent.relative_to(package_root)}")
                 dir_chunk = checksum_size(directory_instance)
