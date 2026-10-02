@@ -7,4 +7,4 @@ This repository is maintained as a standalone firmware-extraction and analysis t
 - Integration validation is summarized in `reports/MULTI_FIRMWARE_VALIDATION_2026-09-28.md`; raw firmware archives, complete extracted trees, and reverse-engineering project databases are not stored in this repository.
 - Third-party provenance and license boundaries are documented in `DEPENDENCIES.md` and `dependencies/THIRD_PARTY_NOTICES.md`.
 
-Commit metadata for the publication branch uses the `harman-f` GitHub identity and GitHub noreply addressing.
+Commit history may include maintainer, GitHub automation, Dependabot, and tooling identities. Do not infer source provenance or trust from a single author/committer identity; use repository history, reviewed pull requests, hashes, and the documented dependency/provenance records.
