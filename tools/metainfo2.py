@@ -500,17 +500,21 @@ def _plan_refresh(text: str, package_root: Path, mode: str = "auto") -> tuple[st
                 continue
             _update_value(editor, changes, final_checksum, script_digests[0],
                           f"FinalScript first SHA-1 block: {script.relative_to(package_root)}")
-            try:
-                generated, total_size, _ = plan_hashes(script.parent, DEFAULT_CHECKSUM_SIZE)
-            except ValueError as exc:
-                unresolved.append({"section": section, "reason": f"FinalScript directory: {exc}"})
-                continue
             dir_name = (PurePosixPath(final_script["value"].replace("\\", "/")).parent / "dir").as_posix()
             dir_name = dir_name.removeprefix("./").replace("/", "\\").casefold()
             matches = [candidate for candidate in editable_instances
                        if candidate["name"].replace("/", "\\").casefold() == dir_name]
             if matches:
                 directory_instance = matches[0]
+                if id(directory_instance) in dir_errors:
+                    unresolved.append({"section": section,
+                                       "reason": f"FinalScript directory: {dir_errors[id(directory_instance)]}"})
+                    continue
+                if id(directory_instance) not in dir_plans:
+                    unresolved.append({"section": section,
+                                       "reason": "FinalScript directory planning unavailable"})
+                    continue
+                generated, total_size, _ = dir_plans[id(directory_instance)]
                 _update_value(editor, changes, first_key(directory_instance, "FileSize"), str(total_size),
                               f"FinalScript directory payload + hashes.txt bytes: {script.parent.relative_to(package_root)}")
                 dir_chunk = checksum_size(directory_instance)
