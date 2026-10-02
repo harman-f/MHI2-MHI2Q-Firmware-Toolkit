@@ -28,7 +28,10 @@ class PublicHygieneTests(unittest.TestCase):
             ["git", "ls-files", "-z"], cwd=ROOT
         ).decode("utf-8").split("\0")
         offenders: list[str] = []
+        this_test = Path(__file__).resolve().relative_to(ROOT).as_posix()
         for rel in filter(None, paths):
+            if rel == this_test:
+                continue
             path = ROOT / rel
             try:
                 text = path.read_text(encoding="utf-8")
