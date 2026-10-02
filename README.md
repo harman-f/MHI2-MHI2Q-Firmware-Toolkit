@@ -1,6 +1,6 @@
-# MHI2 / MHI2Q Firmware Toolkit
+# MHI2 / MHI2Q / MH2P Firmware Toolkit
 
-A host-side toolkit for inventorying MHI2-family firmware packages, exporting RCC/MMX components into reviewable directory trees, auditing opaque binary payloads, and reconstructing supported SWDL metadata. Firmware archives and generated exports are user-supplied data and are deliberately not part of this repository.
+A host-side toolkit for inventorying MHI2/MHI2Q firmware packages and bounded MH2P/Alpine inputs, exporting supported components into reviewable directory trees, auditing opaque binary payloads, and reconstructing supported SWDL metadata. Firmware archives and generated exports are user-supplied data and are deliberately not part of this repository.
 
 **Project license:** GNU GPL-3.0-only for project-authored code and documentation unless an individual file or notice states otherwise. See `LICENSE` and `DEPENDENCIES.md`.
 
@@ -8,13 +8,23 @@ A host-side toolkit for inventorying MHI2-family firmware packages, exporting RC
 
 The extraction implementation has been exercised end-to-end against six MHI2 firmware baselines spanning Audi, Škoda, Volkswagen and SEAT, including AUG22, G11/G13-family trains and both 50/70 variants. All selected MMX/RCC filesystems materialized successfully; the only intentional `PARTIAL` classification is the pair of raw Quickboot payloads, which remain opaque by design. An independent post-extraction rehash verified 74,574/74,574 materialized files with zero missing, extra or mismatched files. See `reports/MULTI_FIRMWARE_VALIDATION_2026-09-28.md` and the detailed MU1440 baseline audit.
 
-This validation is substantial MHI2 coverage, not a claim of universal compatibility. MHI2Q remains within the toolkit's intended scope but has not yet received the same full-corpus extraction validation.
+This validation is substantial MHI2 coverage, not a claim of universal compatibility. MHI2Q remains within the toolkit's intended scope but has not yet received the same full-corpus extraction validation. MH2P/Alpine is also in scope, but the current evidence is deliberately narrower: one VW G36 P2838 firmware baseline was exercised successfully and is treated as a strong single-sample validation, not as proof of cross-train compatibility.
+
+### Capability / evidence matrix
+
+| Family | Published support level | Validation evidence | Claim boundary |
+|---|---|---|---|
+| MHI2 | Stable core | Six firmware baselines across multiple OEM/train combinations | Broadly exercised, not universal |
+| MHI2Q | Intended core scope | Less corpus coverage than MHI2 | Validate each train before relying on portability |
+| MH2P / Alpine | Experimental / bounded | One VW G36 P2838 baseline exercised successfully | Do not generalize one successful firmware to all MH2P trains |
+
+For a tool-by-tool operational guide, including inputs, outputs, dependencies, failure behavior and example commands, see `docs/TOOL_GUIDE.md`. For the MH2P evidence boundary and the recommended workflow, see `docs/MH2P_GUIDE.md`.
 
 Current stable parsing paths include QNX6 MMX app/EFS trees (external qnxmount), RCC root IFS (external dumpifs + LZO), RCC/MMX MIFS Stage 2, Android-style Stage 1/EIFS modules, Emergency IFS, and metadata-only symlink preservation. Unknown image/binary payloads remain byte-exact and can be inspected with the read-only binary probe rather than being misrepresented as parsed filesystems. Bounded MH2P/Alpine `LZ4_` Stage-2 probes are available separately under `tools/experimental/`; they are intentionally partial and do not imply general MH2P support.
 
 ## Quick start
 
-Requirements vary by selected component: Python 3.10+, 7-Zip for firmware archives, and separately provisioned qnxmount, dumpifs, and LZO support for paths that need them. Start with `DEPENDENCIES.md`; this is not a self-contained offline bundle.
+Requirements vary by selected component: Python 3.10+, 7-Zip for firmware archives, and separately provisioned qnxmount, dumpifs, LZO, or LZ4 support for paths that need them. Start with `docs/TOOL_GUIDE.md` to choose the right entry point, then `DEPENDENCIES.md`; this is not a self-contained offline bundle.
 
 Windows PowerShell:
 
@@ -63,6 +73,10 @@ A full extracted-filesystem-to-stock-image rebuild is **not** yet claimed. QNX6/
 - `tools/jxe2jar/`: commit-pinned wrapper for the preferred external JXE converter.
 - `tools/experimental/`: explicitly partial MH2P/Alpine Stage-2 probes.
 - `tests/`: synthetic/unit tests; no firmware images required.
+- `docs/FIRMWARE_IMAGE_PRIMER.md`: cross-family theory for package/container/filesystem layers, offsets, evidence levels and parser selection.
+- `docs/TOOL_GUIDE.md`: human- and agent-oriented tool catalog, decision flow, inputs/outputs, dependencies and examples.
+- `docs/AGENT_PLAYBOOK.md`: use-case recipes such as unpack, Java/LSD, comparison, unknown images, MH2P and package rebuild.
+- `docs/MH2P_GUIDE.md`: MH2P/Alpine validation boundary and bounded Stage-2 workflow.
 - `docs/MHI2_IMAGE_FORMATS_AND_LAYOUT.md`: image/container layout and extraction model.
 - `docs/MHI2_FLASH_LAYOUT_AND_RECOVERY.md`: measured image sizes/start bytes, historical address evidence and recovery boundaries.
 - `docs/REPACK_AND_METAINFO.md`: reverse/package reconstruction model and current rebuild capability matrix.
@@ -84,7 +98,7 @@ The extractor reads source archives/images and only writes to a requested new ou
 
 Firmware and derived filesystem data stay outside Git; `.gitignore` blocks common firmware/archive extensions as a safeguard, not as a substitute for reviewing `git status`.
 
-The current integration corpus validates multiple MHI2 OEM/train combinations; MHI2Q and additional platforms remain coverage-expansion targets until equivalent corpus evidence exists. Contributions should prefer small redistributable synthetic fixtures. Do not commit proprietary firmware data without a separate explicit review.
+The current integration corpus validates multiple MHI2 OEM/train combinations. MHI2Q remains a coverage-expansion target. MH2P/Alpine has one strong end-to-end validation baseline (VW G36 P2838), but one sample is not treated as family-wide compatibility evidence. Contributions should prefer small redistributable synthetic fixtures. Do not commit proprietary firmware data without a separate explicit review.
 
 ## Preferred external LSD/JXE workflow
 
