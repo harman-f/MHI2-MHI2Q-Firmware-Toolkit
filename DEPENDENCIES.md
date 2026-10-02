@@ -14,13 +14,20 @@ This inventory describes the current source tree and observed workflow. Pins do 
 | lclevy/dumpifs | RCC compressed root IFS | commit `bb77c71bae3ebb54b8b7469ac810c890530f3213` | BSD-2-Clause in reviewed checkout; external. |
 | python-lzo | RCC LZO parsing and Stage-2 LZO1Z decoding | 1.15 observed in the validated environment | GPL-2.0-only in reviewed package metadata. Not bundled. The extractor imports it in-process for selected modes. Resolve compatibility before distributing a combined GPL-3.0-only environment. |
 
-This repository does not vendor qnxmount, dumpifs, python-lzo or 7-Zip. The rebuilt metainfo helper also does not vendor or require the historical ConfigObj/six dependency pair. `requirements.txt` contains only kaitaistruct and crcmod; installing it alone does not enable every parser.
+This repository does not vendor qnxmount, dumpifs, python-lzo, python-lz4, 7-Zip or jxe2jar. The rebuilt metainfo helper also does not vendor or require the historical ConfigObj/six dependency pair. `requirements.txt` contains only kaitaistruct and crcmod; installing it alone does not enable every parser.
+
+## Experimental parser dependency
+
+The bounded MH2P `LZ4_` probes under `tools/experimental/` require the
+external `lz4` Python package only when an actual segment is decompressed.
+The unit tests for their bounds/header logic do not require it. Generated MH2P
+trees remain local-only and may contain device-specific key material.
 
 ## External analysis / post-processing tools
 
 | Tool | Purpose | Reviewed reference | Status |
 |---|---|---|---|
-| luka-dev/jxe2jar | **Preferred external JXE conversion/comparison baseline** | reviewed pin `3bae6e82177c7084a008c42373042e6eebf5653e` | Obtain from upstream. No clear top-level license grant found at the reviewed pin, so it is not bundled or redistributed here. |
+| luka-dev/jxe2jar | **Preferred external JXE conversion/comparison baseline** | reviewed pin `9eeb45bbf14bf8afe3452c7be96a4d1f0206a286` | Obtain from upstream. No clear top-level license grant found at the reviewed pin, so it is not bundled or redistributed here. |
 | JeniCzech92/lsdtool | Practical `lsd.jxe -> JAR -> Java` workflow | tree `4bf44aac95f03cf3b81985dd9ccd9c81fb1ef63d` | MIT project; external. Reviewed tree includes separate MIT notices for JXE2JAR and CFR. |
 | CFR | JAR-to-Java decompilation | 0.152, SHA-256 `f686e8f3ded377d7bc87d216a90e9e9512df4156e75b06c655a16648ae8765b2` | MIT; external, not bundled. |
 | Java | Runs Java decompilers/tools | Java 8 used in an earlier validated workflow | External runtime; record vendor/version. |
@@ -37,11 +44,10 @@ See `docs/EXTERNAL_TOOLS.md` for usage boundaries and reproducibility guidance.
 | ReverseEngDotDev/dump_hbcifs, commit `6aa607a0dc5faf7eed055531a65ec682715dfb6e` | QNX IFS/ImageFS format behavior | No license grant found at reviewed pin; reference only, no code copied. |
 | UCL 1.02 | NRV2B format/algorithm reference | GPL; no UCL code linked or bundled. |
 | Binary Refinery 0.11.2 | Differential test oracle for NRV2B | BSD-3-Clause; not a runtime dependency. Attribution is in `dependencies/THIRD_PARTY_NOTICES.md`. |
-| luka-dev/jxe2jar, pin `3bae6e82177c7084a008c42373042e6eebf5653e` | JXE-to-JAR format/behavior reference and preferred comparison baseline | No top-level license grant found during 2026-09-28 review; not bundled or copied into this toolkit. |
+| luka-dev/jxe2jar, pin `9eeb45bbf14bf8afe3452c7be96a4d1f0206a286` | JXE-to-JAR format/behavior reference and preferred comparison baseline | No top-level license grant found during 2026-09-28 review; not bundled or copied into this toolkit. |
 | alelec/mib2-update-hashes | Historical metainfo2/update-hash tooling lineage | External reference only; no code copied into this repository. |
 | ConfigObj 5 | Dependency used by a reviewed historical hash helper | BSD-3-Clause in the supplied/reference copy; **not** a runtime dependency of this toolkit. |
 | six 1.15.0 | Python 2/3 compatibility dependency used by that historical ConfigObj copy | MIT; **not** a runtime dependency of this toolkit. |
-| MIB2 HIGH - MHI2/Q Password List V4.0 (16.06.2022) | Historical public root-hash/password and firmware/MU reference | Original PDF is not bundled. Normalized factual CSV extracts are included with source-page/raw-line provenance. |
 | LateAlways/mibwiki-mirror | Public historical documentation for MHI2 update metadata/recovery behavior | Documentation reference only. |
 
 GPL is not a noncommercial-use restriction. The distinction here is the exact license compatibility and redistribution conditions. Publicly accessible source without a license grant is not automatically reusable by attribution alone.
