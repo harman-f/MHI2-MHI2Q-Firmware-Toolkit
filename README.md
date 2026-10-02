@@ -67,7 +67,7 @@ A full extracted-filesystem-to-stock-image rebuild is **not** yet claimed. QNX6/
 - `docs/MHI2_FLASH_LAYOUT_AND_RECOVERY.md`: measured image sizes/start bytes, historical address evidence and recovery boundaries.
 - `docs/REPACK_AND_METAINFO.md`: reverse/package reconstruction model and current rebuild capability matrix.
 - `docs/EXTERNAL_TOOLS.md`: external Java, Ghidra and QNX toolchains.
-- `reports/`: multi-firmware validation matrix, detailed MU1440 baseline audit, and explicit limitations.
+- `reports/`: validation reports, limitations, and the 2026-10-02 public migration/toolchain audit.
 - `DEPENDENCIES.md`: provenance, license status, and packaging boundaries.
 
 Run tests with:
