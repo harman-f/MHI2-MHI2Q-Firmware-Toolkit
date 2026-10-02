@@ -190,6 +190,72 @@ class MetainfoTests(unittest.TestCase):
                                 for item in report["unresolved"]))
             self.assertEqual(sidecars, {})
 
+    def test_dir_hashes_use_relative_paths_for_nested_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload_dir = root / "D"
+            nested = payload_dir / "sub"
+            nested.mkdir(parents=True)
+            (nested / "file.bin").write_bytes(b"nested")
+            text = (
+                '[D\\Dir]\n'
+                'FileSize = "0"\n'
+                'CheckSum = "old"\n'
+            )
+            _, _, sidecars = mod._plan_refresh(text, root, "full")
+            hashes = sidecars[payload_dir / "hashes.txt"].decode()
+            self.assertIn('FileName = "sub/file.bin"', hashes)
+            self.assertNotIn('FileName = "file.bin"', hashes)
+
+    def test_parent_dir_uses_planned_child_hashes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            child = root / "parent" / "child"
+            child.mkdir(parents=True)
+            (child / "payload.bin").write_bytes(b"payload")
+            (child / "hashes.txt").write_text("stale\n", encoding="utf-8")
+            text = (
+                '[parent\\Dir]\n'
+                'FileSize = "0"\n'
+                'CheckSum = "old"\n\n'
+                '[parent\\child\\Dir]\n'
+                'FileSize = "0"\n'
+                'CheckSum = "old"\n'
+            )
+            refreshed, _, sidecars = mod._plan_refresh(text, root, "full")
+            child_sidecar = sidecars[child / "hashes.txt"]
+            parent_sidecar = sidecars[root / "parent" / "hashes.txt"].decode()
+            self.assertIn('FileName = "child/hashes.txt"', parent_sidecar)
+            self.assertIn(mod.sha1_bytes(child_sidecar), parent_sidecar)
+
+            for path, data in sidecars.items():
+                path.write_bytes(data)
+            refreshed_again, report_again, sidecars_again = mod._plan_refresh(
+                refreshed, root, "full"
+            )
+            self.assertEqual(refreshed_again, refreshed)
+            self.assertEqual(sidecars_again, {})
+            self.assertEqual(report_again["status"], "PASS")
+
+    def test_checksum_insertion_after_unterminated_anchor_adds_newline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            payload = root / "A" / "f.bin"
+            payload.parent.mkdir()
+            payload.write_bytes(b"a" * 10 + b"b" * 10)
+            text = (
+                '[A\\Application]\n'
+                'FileName = "f.bin"\n'
+                'FileSize = "20"\n'
+                'CheckSumSize = "10"\n'
+                'CheckSum = "old"'
+            )
+            refreshed, report = mod.audit_and_refresh(text, root)
+            first = mod.sha1_bytes(b"a" * 10)
+            second = mod.sha1_bytes(b"b" * 10)
+            self.assertIn(f'CheckSum = "{first}"\nCheckSum1 = "{second}"\n', refreshed)
+            self.assertEqual(report["suspicious_non_ini_lines"], [])
+
     def test_flags_non_ini_line(self):
         text = '[common]\nrelease = "x"\necho unexpected\n'
         _, report = mod.audit_and_refresh(text, Path(".").resolve())
