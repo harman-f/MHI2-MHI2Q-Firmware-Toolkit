@@ -2,6 +2,7 @@
 
 import importlib.util
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -34,6 +35,21 @@ class Lz4PrefixTests(unittest.TestCase):
     def test_output_limit_is_bounded(self) -> None:
         with self.assertRaises(ValueError):
             probe.decode_lz4_block_to_limit(b"\x50hello", probe.MAX_BLOCK_LIMIT + 1)
+
+    def test_compressed_input_read_is_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "main_stage2.img"
+            output_limit = 5
+            read_limit = probe.lz4_compress_bound(
+                output_limit + probe.MAX_MATCH_OVERSHOOT
+            )
+            with source.open("wb") as stream:
+                stream.write(b"LZ4_" + output_limit.to_bytes(4, "little"))
+                stream.write(bytes(probe.OBSERVED_DATA_OFFSET - 8))
+                stream.write(b"X" * (read_limit + 4096))
+            data = probe.read_bounded_compressed_input(source, output_limit)
+            self.assertEqual(len(data), read_limit)
+            self.assertLess(len(data), source.stat().st_size - probe.OBSERVED_DATA_OFFSET)
 
 
 if __name__ == "__main__":
