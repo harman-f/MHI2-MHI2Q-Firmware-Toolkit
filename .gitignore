@@ -1,0 +1,22 @@
+# Firmware packages, images, and derived files (review git status before staging)
+*.7z
+*.zip
+*.img
+*.bin
+*.ifs
+*.efs
+*.jxe
+*.jar
+*.class
+*.so
+*.dll
+*.exe
+
+# Local exports, Python artifacts, and virtual environments
+/export*/
+/exports/
+/output/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
