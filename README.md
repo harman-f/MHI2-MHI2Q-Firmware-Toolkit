@@ -10,7 +10,7 @@ The extraction implementation has been exercised end-to-end against six MHI2 fir
 
 This validation is substantial MHI2 coverage, not a claim of universal compatibility. MHI2Q remains within the toolkit's intended scope but has not yet received the same full-corpus extraction validation.
 
-Current parsing paths include QNX6 MMX app/EFS trees (external qnxmount), RCC root IFS (external dumpifs + LZO), RCC/MMX MIFS Stage 2, Android-style Stage 1/EIFS modules, Emergency IFS, and metadata-only symlink preservation. Unknown image/binary payloads remain byte-exact and can be inspected with the read-only binary probe rather than being misrepresented as parsed filesystems.
+Current stable parsing paths include QNX6 MMX app/EFS trees (external qnxmount), RCC root IFS (external dumpifs + LZO), RCC/MMX MIFS Stage 2, Android-style Stage 1/EIFS modules, Emergency IFS, and metadata-only symlink preservation. Unknown image/binary payloads remain byte-exact and can be inspected with the read-only binary probe rather than being misrepresented as parsed filesystems. Bounded MH2P/Alpine `LZ4_` Stage-2 probes are available separately under `tools/experimental/`; they are intentionally partial and do not imply general MH2P support.
 
 ## Quick start
 
@@ -33,7 +33,7 @@ Output directories must be new and nonexistent. Failed extractions preserve part
 
 ## Selective modes
 
-Repeat `--component` to combine `rcc`, `mmx`, and `java`. The `java` component exports Stage 2 and the LSD JXE source file. JXE-to-JAR/Java decompilation is intentionally external. For new JXE conversion and firmware-to-firmware Java comparisons, the preferred route is `luka-dev/jxe2jar`; `JeniCzech92/lsdtool` remains a clearly licensed known-working alternative. See `docs/EXTERNAL_TOOLS.md` for exact pins, licensing notes, CFR, Ghidra and QNX ARM tooling.
+Repeat `--component` to combine `rcc`, `mmx`, and `java`. The `java` component exports Stage 2 and the LSD JXE source file. JXE-to-JAR conversion remains external-code execution: `tools/jxe2jar/convert-jxe.ps1` checks out the reviewed `luka-dev/jxe2jar` commit `9eeb45bbf14bf8afe3452c7be96a4d1f0206a286`, verifies the checkout, converts the JXE, validates the JAR, and records hashes. Upstream code is not vendored. `JeniCzech92/lsdtool` remains a clearly licensed historical cross-check. See `docs/EXTERNAL_TOOLS.md`.
 
 Use `--variant auto|50|70|both`, `--expected-sha256`, and `--plan` to constrain or inspect runs.
 
@@ -59,7 +59,9 @@ A full extracted-filesystem-to-stock-image rebuild is **not** yet claimed. QNX6/
 
 ## Contents
 
-- `tools/`: extractor, bounded parsers, metadata/repack helpers, binary probe, Bash host menu.
+- `tools/`: stable extractor, bounded parsers, metadata/repack helpers, binary probe, Bash host menu.
+- `tools/jxe2jar/`: commit-pinned wrapper for the preferred external JXE converter.
+- `tools/experimental/`: explicitly partial MH2P/Alpine Stage-2 probes.
 - `tests/`: synthetic/unit tests; no firmware images required.
 - `docs/MHI2_IMAGE_FORMATS_AND_LAYOUT.md`: image/container layout and extraction model.
 - `docs/MHI2_FLASH_LAYOUT_AND_RECOVERY.md`: measured image sizes/start bytes, historical address evidence and recovery boundaries.
@@ -70,7 +72,10 @@ A full extracted-filesystem-to-stock-image rebuild is **not** yet claimed. QNX6/
 
 Run tests with:
 
+    python -m compileall -q tools tests
     python -m unittest discover -s tests -v
+
+CI runs the suite on Python 3.10 and 3.12, includes public-repository hygiene checks, and runs CodeQL on `main` and pull requests.
 
 
 ## Safety and scope
@@ -83,4 +88,4 @@ The current integration corpus validates multiple MHI2 OEM/train combinations; M
 
 ## Preferred external LSD/JXE workflow
 
-For new `lsd.jxe -> JAR` conversion, class-set comparison and firmware-to-firmware Java analysis, use `luka-dev/jxe2jar` as the preferred external baseline at the pinned revision documented in `docs/EXTERNAL_TOOLS.md`. It is not bundled or redistributed here because no clear top-level license grant was found at the reviewed pin. `JeniCzech92/lsdtool` remains a useful MIT-licensed known-working alternative and cross-check.
+For new `lsd.jxe -> JAR` conversion and Java-analysis baselines, use `luka-dev/jxe2jar` at the exact reviewed pin documented in `docs/EXTERNAL_TOOLS.md`. The project-authored wrapper in `tools/jxe2jar/` fetches that external revision without vendoring it. The previously documented `3bae6e…` pin is no longer treated as current; the 2026-10-02 reviewed pin is `9eeb45bb…`. `JeniCzech92/lsdtool` remains a useful MIT-licensed historical cross-check.
