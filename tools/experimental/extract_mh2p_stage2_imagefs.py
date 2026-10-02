@@ -25,6 +25,30 @@ MAX_BLOCK_LIMIT = 32 * 1024 * 1024
 MAX_MATCH_OVERSHOOT = 64 * 1024
 
 
+def lz4_compress_bound(uncompressed_size: int) -> int:
+    """Return the standard worst-case encoded-size bound for one LZ4 block."""
+    if uncompressed_size < 0:
+        raise ValueError("uncompressed size must be non-negative")
+    return uncompressed_size + (uncompressed_size // 255) + 16
+
+
+def read_bounded_compressed_input(source: Path, output_limit: int) -> bytes:
+    """Read only the maximum compressed prefix needed by the bounded probe.
+
+    The pure-Python decoder permits at most MAX_MATCH_OVERSHOOT bytes beyond
+    the advertised output target.  Use the LZ4 worst-case encoded-size bound
+    for that maximum decoded allowance instead of buffering the rest of the
+    source file.
+    """
+    if output_limit <= 0 or output_limit > MAX_BLOCK_LIMIT:
+        raise ValueError(f"unsafe LZ4 output limit: {output_limit}")
+    max_decoded = output_limit + MAX_MATCH_OVERSHOOT
+    max_encoded = lz4_compress_bound(max_decoded)
+    with source.open("rb") as stream:
+        stream.seek(OBSERVED_DATA_OFFSET)
+        return stream.read(max_encoded)
+
+
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -127,11 +151,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if not 0 < block_limit <= MAX_BLOCK_LIMIT:
         raise ValueError(f"unsafe LZ4 block cap in header: {block_limit}")
 
-    with source.open("rb") as stream:
-        stream.seek(OBSERVED_DATA_OFFSET)
-        compressed_tail = stream.read()
-    compressed_bytes, decoded_block = decode_lz4_block_to_limit(compressed_tail, block_limit)
-    encoded_block = compressed_tail[:compressed_bytes]
+    compressed_prefix = read_bounded_compressed_input(source, block_limit)
+    compressed_bytes, decoded_block = decode_lz4_block_to_limit(compressed_prefix, block_limit)
+    encoded_block = compressed_prefix[:compressed_bytes]
 
     if args.lz4_module_root:
         sys.path.insert(0, str(args.lz4_module_root.resolve(strict=True)))
