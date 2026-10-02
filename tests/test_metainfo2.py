@@ -147,6 +147,38 @@ class MetainfoTests(unittest.TestCase):
             self.assertIn(scripts / "hashes.txt", sidecars)
             self.assertIn(mod.chunk_sha1_file(script)[1][0], refreshed)
 
+    def test_finalscript_reuses_matching_dir_chunk_size(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            scripts = root / "scripts"
+            scripts.mkdir()
+            script = scripts / "final.sh"
+            script.write_bytes(b"abcdefghij")
+            text = (
+                '[common]\n'
+                'FinalScript = "./scripts/final.sh"\n'
+                'FinalScriptChecksum = "old"\n\n'
+                '[scripts\\dir]\n'
+                'FileSize = "0"\n'
+                'CheckSumSize = "3"\n'
+                'CheckSum = "old"\n'
+            )
+            refreshed, report, sidecars = mod._plan_refresh(text, root, "full")
+            self.assertEqual(report["status"], "PASS")
+            sidecar = sidecars[scripts / "hashes.txt"]
+            hashes = sidecar.decode()
+            self.assertIn('CheckSumSize = "3"', hashes)
+            self.assertIn(mod.sha1_bytes(b"abc"), hashes)
+
+            for path, data in sidecars.items():
+                path.write_bytes(data)
+            refreshed_again, report_again, sidecars_again = mod._plan_refresh(
+                refreshed, root, "full"
+            )
+            self.assertEqual(refreshed_again, refreshed)
+            self.assertEqual(sidecars_again, {})
+            self.assertEqual(report_again["status"], "PASS")
+
     def test_dir_parent_escape_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "package"
