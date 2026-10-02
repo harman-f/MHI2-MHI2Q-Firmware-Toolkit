@@ -55,7 +55,7 @@ def _safe_relative(raw: bytes) -> str:
     return path.as_posix()
 
 
-def inventory_imagefs(image: Path) -> dict[str, Any]:
+def inventory_imagefs(image: Path, *, allow_incomplete: bool = False) -> dict[str, Any]:
     size = image.stat().st_size
     with image.open("rb") as stream:
         header = _read_exact(stream, 88, "header")
@@ -64,10 +64,12 @@ def inventory_imagefs(image: Path) -> dict[str, Any]:
         flags = header[7]
         endian = ">" if flags & 0x01 else "<"
         image_size, hdr_dir_size, dir_offset = struct.unpack_from(endian + "III", header, 8)
-        if image_size < 92 or image_size > size or image_size > 0xFFFFFFFF:
+        if image_size < 92 or (image_size > size and not allow_incomplete) or image_size > 0xFFFFFFFF:
             raise ValueError(f"invalid ImageFS declared size {image_size} (source {size})")
         if not 88 <= dir_offset <= hdr_dir_size <= image_size - 4:
             raise ValueError("invalid ImageFS directory bounds")
+        if hdr_dir_size > size:
+            raise ValueError("ImageFS directory extends beyond available prefix")
 
         stream.seek(dir_offset)
         entries: list[dict[str, Any]] = []
@@ -112,6 +114,8 @@ def inventory_imagefs(image: Path) -> dict[str, Any]:
                     raise ValueError(f"ImageFS file span outside image at {position:#x}")
                 item.update(type="file", path=_safe_relative(raw_path), data_offset=data_offset,
                             bytes=data_size)
+                if allow_incomplete:
+                    item["data_complete"] = data_offset + data_size <= size
             elif kind == S_IFDIR:
                 raw_path, _ = _cstring(payload, 0, len(payload), "directory path")
                 item.update(type="directory", path=_safe_relative(raw_path))
@@ -146,17 +150,26 @@ def inventory_imagefs(image: Path) -> dict[str, Any]:
 
         if position != hdr_dir_size:
             raise ValueError("ImageFS directory table did not end at declared boundary")
-        return {"source_bytes": size, "source_sha256": sha256_file(image),
+        result = {"source_bytes": size, "source_sha256": sha256_file(image),
                 "image_size": image_size, "flags": flags,
                 "byte_order": "big" if endian == ">" else "little",
                 "directory_offset": dir_offset, "directory_end": hdr_dir_size,
                 "trailer_offset": image_size - 4, "entries": entries,
                 "duplicate_paths": collisions}
+        if allow_incomplete:
+            result["image_complete"] = image_size <= size
+            result["complete_file_entries"] = sum(
+                item["type"] == "file" and item["data_complete"] for item in entries
+            )
+            result["incomplete_file_entries"] = sum(
+                item["type"] == "file" and not item["data_complete"] for item in entries
+            )
+        return result
 
 
-def materialize_imagefs(image: Path, output_tree: Path, metadata_path: Path, *, display_root: Path | None = None) -> dict[str, Any]:
-    """Create a new tree; represent links and special nodes only in metadata."""
-    inventory = inventory_imagefs(image)
+def _materialize_imagefs(image: Path, output_tree: Path, metadata_path: Path,
+                         *, allow_incomplete: bool) -> dict[str, Any]:
+    inventory = inventory_imagefs(image, allow_incomplete=allow_incomplete)
     if output_tree.exists() or metadata_path.exists():
         raise FileExistsError("ImageFS output or metadata already exists; choose fresh additive paths")
     output_tree.mkdir(parents=True, exist_ok=False)
@@ -174,7 +187,10 @@ def materialize_imagefs(image: Path, output_tree: Path, metadata_path: Path, *, 
             if entry["type"] == "directory":
                 destination.mkdir(parents=True, exist_ok=True)
             elif entry["type"] == "file":
-                if rel in duplicates or rel in written:
+                if allow_incomplete and not entry["data_complete"]:
+                    record["materialized"] = False
+                    record["materialize_note"] = "file extent exceeds available validated prefix"
+                elif rel in duplicates or rel in written:
                     record["materialized"] = False
                     record["materialize_note"] = "duplicate path retained only in metadata"
                 else:
@@ -199,10 +215,18 @@ def materialize_imagefs(image: Path, output_tree: Path, metadata_path: Path, *, 
                    "materialized_files": len(written),
                    "materialized_bytes": sum(p.stat().st_size for p in output_tree.rglob("*") if p.is_file())},
                   stream, indent=2)
-    tree_display = (output_tree.relative_to(display_root).as_posix() if display_root else output_tree.name)
-    metadata_display = (metadata_path.relative_to(display_root).as_posix() if display_root else metadata_path.name)
-    return {"tree": tree_display, "metadata": metadata_display,
+    return {"tree": str(output_tree), "metadata": str(metadata_path),
             "entry_count": len(records), "file_count": len(written),
             "symlink_count": sum(1 for item in records if item["type"] == "symlink"),
             "special_count": sum(1 for item in records if item["type"] == "special"),
             "bytes": sum(p.stat().st_size for p in output_tree.rglob("*") if p.is_file())}
+
+
+def materialize_imagefs(image: Path, output_tree: Path, metadata_path: Path) -> dict[str, Any]:
+    """Create a new tree; represent links and special nodes only in metadata."""
+    return _materialize_imagefs(image, output_tree, metadata_path, allow_incomplete=False)
+
+
+def materialize_imagefs_prefix(image: Path, output_tree: Path, metadata_path: Path) -> dict[str, Any]:
+    """Materialize only complete files in a directory-validated ImageFS prefix."""
+    return _materialize_imagefs(image, output_tree, metadata_path, allow_incomplete=True)
