@@ -9,12 +9,12 @@ Use `--component java` to export the recovered `lsd.jxe`. Conversion/decompilati
 ### Preferred external conversion/research route: luka-dev/jxe2jar
 
 - Project: https://github.com/luka-dev/jxe2jar
-- Reviewed pin: `3bae6e82177c7084a008c42373042e6eebf5653e`
+- Reviewed pin: `9eeb45bbf14bf8afe3452c7be96a4d1f0206a286` (reviewed 2026-10-02)
 - No clear top-level license grant was found during the 2026-09-28 review.
 
-For **new JXE-to-JAR conversions, decompilation baselines, class-set comparisons and firmware-to-firmware Java audits, prefer `luka-dev/jxe2jar`**. This is the route used as the comparison baseline for this toolkit's current firmware research.
+For **new JXE-to-JAR conversions and current Java-analysis baselines, prefer `luka-dev/jxe2jar` at the pinned revision above**. This is the route used as the comparison baseline for this toolkit's current firmware research.
 
-Because no clear top-level license grant was found at the reviewed pin, this repository does not copy, vendor, bootstrap or redistribute it. Obtain it directly from the upstream repository, record the exact upstream commit used, and treat local use separately from redistribution.
+Because no clear top-level license grant was found at the reviewed pin, this repository does not copy, vendor or redistribute upstream source. `tools/jxe2jar/convert-jxe.ps1` is a project-authored wrapper that fetches/checks out the exact external commit, verifies a clean worktree, runs the converter, and records the commit plus input/output hashes.
 
 ### Licensed known-working alternative: lsdtool
 
@@ -43,7 +43,7 @@ This is intentionally a discovery link rather than a vendored tutorial or downlo
 - Project: https://github.com/NationalSecurityAgency/ghidra
 - Recommended for ELF/shared-library inspection, ARM/QNX disassembly and headless decompilation.
 - No Ghidra binaries are bundled.
-- Current reviewed public release on 2026-09-28: Ghidra 12.1.4.
+- Current reviewed public release on 2026-10-02: Ghidra 12.1.4.
 - Release archive SHA-256 published upstream: `ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db`.
 - License: Apache-2.0 for the Ghidra project; separately review bundled third-party notices.
 
