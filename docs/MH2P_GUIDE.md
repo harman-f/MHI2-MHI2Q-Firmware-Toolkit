@@ -42,7 +42,9 @@ The MH2P-specific public entry points currently live under `tools/experimental/`
   ImageFS content.
 
 Both tools require a **new output directory**. Both can pin the source by SHA-256. Both
-stop at an unproven boundary instead of reading beyond it.
+stop decoding/materialization at an unproven boundary. The one-block probe also caps its
+compressed-input buffer using the LZ4 worst-case encoded-size bound for the permitted
+decoded-output window instead of buffering the remainder of a large source file.
 
 ## Recommended workflow
 
@@ -61,8 +63,9 @@ stop at an unproven boundary instead of reading beyond it.
 
 For the VW G36 P2838 baseline, the extraction work demonstrated that the firmware contains
 usable QNX filesystem structures and a recoverable segmented `LZ4_` Stage-2 stream. The
-existing strict ImageFS reader was able to validate recovered filesystem images rather than
-requiring relaxed bounds or checksum rules. That is why MH2P is included in this toolkit's
+existing strict ImageFS reader was able to validate recovered filesystem images without
+relaxing structural bounds or file-extent validation. The current ImageFS reader does not
+claim to verify an ImageFS checksum/trailer. That is why MH2P is included in this toolkit's
 documented scope.
 
 The important qualification is corpus size: this conclusion currently rests on one
