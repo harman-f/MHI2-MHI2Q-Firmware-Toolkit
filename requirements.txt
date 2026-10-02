@@ -1,2 +1,2 @@
-kaitaistruct==0.10
+kaitaistruct==0.11
 crcmod==1.7
