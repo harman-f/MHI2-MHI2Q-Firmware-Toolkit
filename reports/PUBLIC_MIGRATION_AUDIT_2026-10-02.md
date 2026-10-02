@@ -2,9 +2,14 @@
 
 ## Scope
 
-This audit records the migration from the archived public repository
+This audit records the migration from the archived source repository
 `harman-f/MHI2-MHI2Q-Firmware-Toolkit_old` into the active standalone public
-repository `harman-f/MHI2-MHI2Q-Firmware-Toolkit`.
+repository `harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit`.
+
+The target repository was initially created under the temporary name
+`harman-f/MHI2-MHI2Q-Firmware-Toolkit` during the migration and was renamed on
+2026-10-02 after MH2P/Alpine documentation and tooling were incorporated. The
+final name above is the only operational repository authority.
 
 Source baseline:
 
