@@ -1,5 +1,7 @@
 # MHI2 firmware image layout and extraction guide
 
+For the cross-family mental model covering MHI2, MHI2Q and MH2P layers, offset types and evidence levels, start with [`FIRMWARE_IMAGE_PRIMER.md`](FIRMWARE_IMAGE_PRIMER.md). This document intentionally remains the detailed MHI2-specific reference.
+
 This document describes the layers an analyst encounters when unpacking MHI2
 firmware, the formats currently observed in the retained MU1440/Audi K3663
 fixtures, what the extraction code knows about them, and where evidence ends.
@@ -177,3 +179,15 @@ For exact sample byte sizes/signatures, historical MMX NOR offset tables, the li
 - QNX, [startup header fields](https://www.get.qnx.com/developers/docs/7.0.0/com.qnx.doc.neutrino.building/topic/ipl/ipl_startup_header.html).
 - QNX, [`dumpifs`](https://qnx.com/developers/docs/6.5.0SP1.update/com.qnx.doc.neutrino_utilities/d/dumpifs.html) and [`mkifs`](https://qnx.com/developers/docs/6.5.0SP1.update/com.qnx.doc.neutrino_utilities/m/mkifs.html).
 - Historical private audit scripts were reviewed for backup-offset evidence. They are not distributed here, and their fixed offset tables are not copied as general format constants.
+
+
+## Relationship to MH2P / Alpine
+
+Do not copy the MHI2 package tree onto MH2P by name. The validated MH2P/Alpine sample uses
+`Data/MMX2P.*` members and an `LZ4_` segmented Stage-2 path rather than the MHI2
+`MMX2/.../mifs-stage2` `LZOZ` container. Some inner QNX/ImageFS concepts are reusable,
+but package routing and container semantics are separate evidence questions.
+
+For the current MH2P support boundary and commands, see
+[`MH2P_GUIDE.md`](MH2P_GUIDE.md). For the common package -> wrapper -> filesystem model,
+see [`FIRMWARE_IMAGE_PRIMER.md`](FIRMWARE_IMAGE_PRIMER.md).

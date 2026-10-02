@@ -2,7 +2,7 @@
 
 ## Repository purpose
 
-This repository is the public, standalone MHI2/MHI2Q firmware analysis toolkit.
+This repository is the public, standalone MHI2/MHI2Q/MH2P firmware analysis toolkit.
 Treat it as an independent project. Do not depend on private research repositories,
 private workstations, private caches, or unpublished firmware corpora.
 
@@ -28,7 +28,8 @@ collisions, malformed containers, and output-directory reuse.
 
 - `tools/` contains the supported public core.
 - `tools/experimental/` contains bounded research-derived probes whose format coverage is
-  intentionally incomplete. Do not describe them as full decoders or universal support.
+  intentionally incomplete. The MH2P/Alpine Stage-2 probes are validated against one VW G36
+  P2838 baseline; do not describe that as universal MH2P support.
 - External LSD/JXE tooling remains external. The wrapper under `tools/jxe2jar/` must pin
   and verify an upstream commit rather than copy unlicensed upstream code.
 
@@ -46,11 +47,15 @@ For every code change:
 Do not weaken path validation, size limits, fresh-output rules, checksum verification,
 or metadata-only handling of symlinks/device nodes merely to accept one sample.
 
+## Operational documentation
+
+Before choosing or invoking a tool, read `docs/FIRMWARE_IMAGE_PRIMER.md`, `docs/TOOL_GUIDE.md` and `docs/AGENT_PLAYBOOK.md`. For MH2P/Alpine work, also read `docs/MH2P_GUIDE.md`. Treat these files as the public operational entry points for humans and AI agents; source docstrings remain implementation-level documentation and do not override stated support boundaries.
+
 ## Documentation claims
 
 Separate measured evidence from inference. State the exact firmware family or sample used
 for validation. A successful extraction from one firmware train is not evidence of universal
-compatibility. Keep historical validation reports dated and do not silently rewrite their
+compatibility. In particular, the current MH2P/Alpine evidence is one VW G36 P2838 baseline. Keep historical validation reports dated and do not silently rewrite their
 measurements to match later tooling.
 
 ## GitHub / CI
